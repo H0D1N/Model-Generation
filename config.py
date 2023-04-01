@@ -1,0 +1,16 @@
+#This is a config for colossal-ai
+from colossalai.amp import AMP_TYPE
+
+NUM_EPOCHES=200
+BATCH_SIZES=256
+LEARNING_RATE=0.01
+WEIGHT_DECAY=1e-4
+LOG_PATH='./log'
+
+fp16 = dict(
+    mode=AMP_TYPE.TORCH,
+)
+gradient_accumulation = 4
+clip_grad_norm = 1.0
+
+
