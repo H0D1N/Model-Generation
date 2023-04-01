@@ -3,7 +3,7 @@ from .AdaResNet import Ada_ResNet,SelectedResNetBlock
 from .TGNetwork import get_TGNetwork
 
 class PromptBasedModel(nn.Module):
-    def __init__(self,ada_kernel=True,is_embed=True,attn_pad=False,vocab_size=100,kernel_number=512,
+    def __init__(self,ada_kernel=True,is_embed=True,attn_pad=False,vocab_size=2,kernel_number=512,
                  block=SelectedResNetBlock,layers=[3,4,6,3],classifer_num=100):
         self.ada_kernel=ada_kernel
         if ada_kernel:

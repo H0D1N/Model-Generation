@@ -112,6 +112,7 @@ def train(engine,train_loader,epoch,logger):
         data_time.update(time.time() - end)
         engine.zero_grad()
         output,selection = engine(prompt,img)
+        output.data.mask_fill_(torch.ones_like(prompt).cuda-prompt,1e-9)
         loss = engine.criterion(output,label,selection)
         losses.update(loss.item(), img.size(0))
 
@@ -146,6 +147,7 @@ def validate(engine,test_loader,logger):
                 prompt = prompt.cuda()
 
                 output,selection = engine(prompt,img)
+                output.data.mask_fill_(torch.ones_like(prompt).cuda - prompt, 1e-9)
                 loss = engine.criterion(output, label,selection)
 
 
