@@ -4,6 +4,7 @@ import shutil
 import colossalai
 import torch
 from timm import utils
+from torch.utils.tensorboard import SummaryWriter
 from colossalai.core import global_context as gpc
 from colossalai.utils import get_dataloader
 from colossalai.nn.lr_scheduler import LinearWarmupLR
@@ -33,6 +34,9 @@ def main():
     host = args.host,
     port = args.port
     )
+
+    writer = SummaryWriter(log_dir='AdaResnet_for_classfication')
+
     logger = get_dist_logger()
     if hasattr(gpc.config, 'LOG_PATH'):
         if gpc.get_global_rank() == 0:
@@ -81,6 +85,10 @@ def main():
         train(engine,train_loader,epoch,logger)
         acc1,usage,loss=validate(engine,test_loader,logger)
         lr_scheduler.step()
+
+        writer.add_scalar(tag='acc',scalar_value=acc1,global_step=epoch)
+        writer.add_scalar(tag='loss',scalar_value=loss,global_step=epoch)
+        writer.add_scalar(tag='GateUsage',scalar_value=usage,global_step=epoch)
 
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
