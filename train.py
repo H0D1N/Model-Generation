@@ -87,7 +87,7 @@ def main():
 
     for epoch in range(args.start_epoch,gpc.config.NUM_EPOCHS):
         train(engine,train_loader,epoch,logger)
-        acc1,usage,loss=validate(engine,test_loader,logger)
+        acc1,usage,loss=validate(engine,test_loader,logger,epoch)
         lr_scheduler.step()
 
         writer.add_scalar(tag='acc',scalar_value=acc1,global_step=epoch)
@@ -148,7 +148,7 @@ def train(engine,train_loader,epoch,logger):
                 data_time=data_time),ranks=[0]
             )
         '''
-def validate(engine,test_loader,logger):
+def validate(engine,test_loader,logger,epoch):
     def run_validate(test_loader):
         with torch.no_grad():
             end = time.time()
@@ -179,21 +179,6 @@ def validate(engine,test_loader,logger):
                 end = time.time()
 
 
-                logger.info(
-                    '{0}: [{1:>4d}/{2}]  '
-                    'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})  '
-                    'Loss: {loss.val:>7.4f} ({loss.avg:>6.4f})  '
-                    'Acc@1: {top1.val:>7.4f} ({top1.avg:>7.4f})  '
-                    'Acc@5: {top5.val:>7.4f} ({top5.avg:>7.4f})   '
-                    'Usage: {usage.val:>7.4f} ({usage.avg:>7.4f})'.format(
-                        'Test', i, len(test_loader)-1,
-                        batch_time=batch_time,
-                        loss=losses,
-                        top1=top1,
-                        top5=top5,
-                        usage=usage),ranks=[0]
-                )
-
     batch_time = utils.AverageMeter()
     losses =utils.AverageMeter()
     top1 = utils.AverageMeter()
@@ -203,6 +188,20 @@ def validate(engine,test_loader,logger):
     # switch to evaluate mode
     engine.eval()
     run_validate(test_loader)
+    logger.info(
+        '{0}: {1}'
+        'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})  '
+        'Loss: {loss.val:>7.4f} ({loss.avg:>6.4f})  '
+        'Acc@1: {top1.val:>7.4f} ({top1.avg:>7.4f})  '
+        'Acc@5: {top5.val:>7.4f} ({top5.avg:>7.4f})   '
+        'Usage: {usage.val:>7.4f} ({usage.avg:>7.4f})'.format(
+            'Test',epoch,
+            batch_time=batch_time.avg,
+            loss=losses.avg,
+            top1=top1.avg,
+            top5=top5.avg,
+            usage=usage.avg), ranks=[0]
+    )
     return top1.avg,usage.avg,losses.avg
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
