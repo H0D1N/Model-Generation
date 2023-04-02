@@ -189,18 +189,18 @@ def validate(engine,test_loader,logger,epoch):
     engine.eval()
     run_validate(test_loader)
     logger.info(
-        '{0}: {1}'
-        'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})  '
-        'Loss: {loss.val:>7.4f} ({loss.avg:>6.4f})  '
-        'Acc@1: {top1.val:>7.4f} ({top1.avg:>7.4f})  '
-        'Acc@5: {top5.val:>7.4f} ({top5.avg:>7.4f})   '
-        'Usage: {usage.val:>7.4f} ({usage.avg:>7.4f})'.format(
+        '{0}: {1}  '
+        'Time:  {batch_time.avg:.3f}    '
+        'Loss: {loss.avg:>6.4f}    '
+        'Acc@1: {top1.avg:>7.4f}    '
+        'Acc@5: {top5.avg:>7.4f}    '
+        'Usage: {usage.avg:>7.4f}'.format(
             'Test',epoch,
-            batch_time=batch_time.avg,
-            loss=losses.avg,
-            top1=top1.avg,
-            top5=top5.avg,
-            usage=usage.avg), ranks=[0]
+            batch_time=batch_time,
+            loss=losses,
+            top1=top1,
+            top5=top5,
+            usage=usage), ranks=[0]
     )
     return top1.avg,usage.avg,losses.avg
 
