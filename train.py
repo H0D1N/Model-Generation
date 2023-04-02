@@ -22,8 +22,7 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--train_task', default='train.txt', type=str, )
 parser.add_argument('--test_task', default='test.txt', type=str, )
-parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
-                    help='evaluate model on validation set')
+
 best_acc1 = 0
 
 def main():
