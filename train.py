@@ -5,6 +5,7 @@ import colossalai
 import torch
 from timm import utils
 from torch.utils.tensorboard import SummaryWriter
+from colossalai.context import ParallelMode
 from colossalai.core import global_context as gpc
 from colossalai.utils import get_dataloader
 from colossalai.nn.lr_scheduler import LinearWarmupLR
@@ -23,15 +24,14 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
 parser.add_argument('--train_task', default='train.txt', type=str, )
 parser.add_argument('--test_task', default='test.txt', type=str, )
 
-best_acc1 = 0
+
 
 def main():
+    best_acc1 = 0
     args = parser.parse_args()
 
-    colossalai.launch_from_slurm(
-    config= './config.py',
-    host = args.host,
-    port = args.port
+    colossalai.launch_from_torch(
+    config= 'config.py',
     )
 
     writer = SummaryWriter(log_dir='AdaResnet_for_classfication')
@@ -76,6 +76,11 @@ def main():
 
     logger.info("Engine is built", ranks=[0])
 
+    if gpc.is_initialized(ParallelMode.PARALLEL_1D):
+        scatter_gather = True
+    else:
+        scatter_gather = False
+
     if args.evaluate:
         validate(engine, test_dataloader,logger)
         return
@@ -119,7 +124,7 @@ def train(engine,train_loader,epoch,logger):
         data_time.update(time.time() - end)
         engine.zero_grad()
         output,selection = engine(prompt,img)
-        output.data.mask_fill_(torch.ones_like(prompt).cuda-prompt,1e-9)
+        output.data.masked_fill_((torch.ones_like(prompt).cuda()-prompt).bool(),-1e4)
         loss = engine.criterion(output,label,selection)
         losses.update(loss.item(), img.size(0))
 
@@ -128,7 +133,7 @@ def train(engine,train_loader,epoch,logger):
         batch_time.update(time.time() - end)
         end = time.time()
 
-
+        '''
         logger.info(
             'Train: {} [{:>4d}/{} ({:>3.0f}%)]  '
             'Loss: {loss.val:#.4g} ({loss.avg:#.3g})  '
@@ -142,7 +147,7 @@ def train(engine,train_loader,epoch,logger):
                 batch_time=batch_time,
                 data_time=data_time),ranks=[0]
             )
-
+        '''
 def validate(engine,test_loader,logger):
     def run_validate(test_loader):
         with torch.no_grad():
@@ -154,7 +159,7 @@ def validate(engine,test_loader,logger):
                 prompt = prompt.cuda()
 
                 output,selection = engine(prompt,img)
-                output.data.mask_fill_(torch.ones_like(prompt).cuda - prompt, 1e-9)
+                output.data.masked_fill_((torch.ones_like(prompt).cuda() - prompt).bool(), -1e4)
                 loss = engine.criterion(output, label,selection)
 
 
@@ -197,11 +202,7 @@ def validate(engine,test_loader,logger):
 
     # switch to evaluate mode
     engine.eval()
-
     run_validate(test_loader)
-
-    top1.all_reduce()
-
     return top1.avg,usage.avg,losses.avg
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):

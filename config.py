@@ -11,6 +11,6 @@ fp16 = dict(
     mode=AMP_TYPE.TORCH,
 )
 gradient_accumulation = 4
-clip_grad_norm = 1.0
+#clip_grad_norm = 1.0
 
 

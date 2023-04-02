@@ -42,4 +42,5 @@ class DecoderLayer(nn.Module):
         # dec_outputs: [batch_size, 1, d_model]  dec_self_attn: [batch_size, n_heads, 1, 1]
         dec_outputs, dec_enc_attn = self.dec_enc_attn(dec_outputs, enc_outputs,
                                                 enc_outputs, dec_enc_attn_mask)
+        dec_outputs = self.pos_ffn(dec_outputs)
         return dec_outputs, dec_self_attn, dec_enc_attn

@@ -27,7 +27,7 @@ class TGNetwork(nn.Module):
 
         self.LayerGating=nn.Linear(select_embbed_len,kernel_number)
 
-    def Improved_SemHash(select_weight):
+    def Improved_SemHash(self,select_weight):
         # select_weight:[batch_size,length,kernel_number]
         binary_selection = torch.lt(torch.zeros_like(select_weight), select_weight).float()
         gradient_selection = torch.max(torch.zeros_like(select_weight), torch.min(torch.ones_like(select_weight), (
@@ -38,7 +38,7 @@ class TGNetwork(nn.Module):
     def forward(self,prompt,):
         #prompt:[batchsize,len]
         enc_outputs,_=self.encoder(prompt)
-        decoder_inputs=torch.zeros(prompt.size(0),1).int()
+        decoder_inputs=torch.zeros(prompt.size(0),1).int().cuda()
         dec_outputs,_,_=self.decoder(decoder_inputs,prompt,enc_outputs)
 
         dec_output=dec_outputs.squeeze()
