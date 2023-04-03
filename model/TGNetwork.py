@@ -37,7 +37,7 @@ class TGNetwork(nn.Module):
         return d
 
     def forward(self,prompt,):
-        #prompt:[batchsize,len]
+        #prompt:[batchsize,prompt_len]
         enc_outputs,_=self.encoder(prompt)
         decoder_inputs=torch.zeros(prompt.size(0),1).int().cuda()
         dec_outputs,_,_=self.decoder(decoder_inputs,prompt,enc_outputs)
@@ -45,11 +45,14 @@ class TGNetwork(nn.Module):
 
         task_cls=dec_outputs[:,0,:]
 
-        selection_embbeding=self.TaskLinear(task_cls)
+        layer_encoding=self.TaskLinear(task_cls)
 
-        selection_embbeding=selection_embbeding.view(-1,self.gate_len,self.select_embed_len)
+        layer_encoding=layer_encoding.view(-1,self.gate_len,self.select_embed_len)
 
-        layer_selection=self.LayerGating(selection_embbeding)
+        #selection_embbeding:[batchsize,layer_len,select_layer_encoding_len]
+
+        layer_selection=self.LayerGating(layer_encoding)
+
 
         layer_selection=self.Improved_SemHash(layer_selection)
 
