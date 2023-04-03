@@ -39,11 +39,10 @@ class TGNetwork(nn.Module):
     def forward(self,prompt,):
         #prompt:[batchsize,prompt_len]
         enc_outputs,_=self.encoder(prompt)
-        decoder_inputs=torch.zeros(prompt.size(0),1).int().cuda()
-        dec_outputs,_,_=self.decoder(decoder_inputs,prompt,enc_outputs)
-        #dec_outputs：[batch_size,prompt_len,d_model]
 
-        task_cls=dec_outputs[:,0,:]
+        #enc_outputs：[batch_size,prompt_len,d_model]
+
+        task_cls=enc_outputs[:,0,:]
 
         layer_encoding=self.TaskLinear(task_cls)
 
