@@ -59,7 +59,7 @@ def main():
 
     optimizer=torch.optim.AdamW(model.parameters(), lr=gpc.config.LEARNING_RATE, weight_decay=gpc.config.WEIGHT_DECAY)
 
-    lr_scheduler = LinearWarmupLR(optimizer, warmup_steps=1, total_steps=gpc.config.NUM_EPOCHS)
+    lr_scheduler = LinearWarmupLR(optimizer, warmup_steps=gpc.config.WARMUP_EPOCHS, total_steps=gpc.config.NUM_EPOCHS)
 
     if args.resume:
         if os.path.isfile(args.resume):
@@ -87,7 +87,7 @@ def main():
 
     for epoch in range(args.start_epoch,gpc.config.NUM_EPOCHS):
         train(engine,train_loader,epoch,logger)
-        acc1,usage,loss=validate(engine,test_loader,logger,epoch)
+        acc1,usage,loss=validate(engine,test_loader,logger,epoch,best_acc1)
         lr_scheduler.step()
 
         writer.add_scalar(tag='acc',scalar_value=acc1,global_step=epoch)
@@ -133,22 +133,20 @@ def train(engine,train_loader,epoch,logger):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        '''
-        logger.info(
-            'Train: {} [{:>4d}/{} ({:>3.0f}%)]  '
-            'Loss: {loss.val:#.4g} ({loss.avg:#.3g})  '
-            'Time: {batch_time.val:.3f}s'
-            ' ({batch_time.avg:.3f}s)   '
-            'Data: {data_time.val:.3f} ({data_time.avg:.3f})'.format(
+
+    logger.info(
+        'Train: {}  '
+        'Loss: {loss.avg:#.3g}  '
+        'Time: {batch_time.avg:.3f}s  '
+        'Data: {data_time.avg:.3f}  '.format(
                 epoch,
-                i, len(train_loader),
-                100. * i / (len(train_loader) - 1),
+                i,
                 loss=losses,
                 batch_time=batch_time,
                 data_time=data_time),ranks=[0]
             )
-        '''
-def validate(engine,test_loader,logger,epoch):
+
+def validate(engine,test_loader,logger,epoch,best_acc1):
     def run_validate(test_loader):
         with torch.no_grad():
             end = time.time()
@@ -194,13 +192,15 @@ def validate(engine,test_loader,logger,epoch):
         'Loss: {loss.avg:>6.4f}    '
         'Acc@1: {top1.avg:>7.4f}    '
         'Acc@5: {top5.avg:>7.4f}    '
-        'Usage: {usage.avg:>7.4f}'.format(
+        'Usage: {usage.avg:>7.4f}   '
+        'Best: {best}  '.format(
             'Test',epoch,
             batch_time=batch_time,
             loss=losses,
             top1=top1,
             top5=top5,
-            usage=usage), ranks=[0]
+            usage=usage,
+            best=best_acc1), ranks=[0]
     )
     return top1.avg,usage.avg,losses.avg
 

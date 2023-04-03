@@ -2,21 +2,23 @@ import torch
 import torch.nn as nn
 from .TransformerEncoder import Encoder
 
-def get_TGNetwork(d_model=512,d_ff=2048,d_k=64,d_v=64,n_layers=4,n_heads=8,attn_pad=False,is_embed=False,
+def get_TGNetwork(task_embed=True,d_model=512,d_ff=2048,d_k=64,d_v=64,n_layers=4,n_heads=8,attn_pad=False,is_embed=False,
                   feature_size=0,vocab_size=100,gate_len=34,select_embbed_len=128,kernel_number=512):
     model=TGNetwork(d_model,d_ff,d_k,d_v,n_layers,n_heads,attn_pad,is_embed,
-                    feature_size,vocab_size,gate_len,select_embbed_len,kernel_number)
+                    feature_size,vocab_size,gate_len,select_embbed_len,kernel_number,task_embed)
     return model
 
 
 class TGNetwork(nn.Module):
     def __init__(self,d_model,d_ff,d_v,d_k,n_layers,n_heads,attn_pad=False,is_embed=False,
-                 feature_size=0,vocab_size=0,gate_len=0,select_embbed_len=0,kernel_number=0):
+                 feature_size=0,vocab_size=0,gate_len=0,select_embbed_len=0,kernel_number=0,task_embed=True):
         super(TGNetwork,self).__init__()
         self.gate_len=gate_len
         self.select_embed_len=select_embbed_len
+        self.task_embed=task_embed
 
-        self.encoder=Encoder(is_embed,d_model,d_k,d_v,d_ff,n_heads,n_layers,feature_size,vocab_size,attn_pad)
+        if task_embed:
+            self.encoder=Encoder(is_embed,d_model,d_k,d_v,d_ff,n_heads,n_layers,feature_size,vocab_size,attn_pad)
 
         self.TaskLinear=nn.Sequential(
             nn.Linear(d_model,4*d_model,bias=False),
@@ -38,11 +40,14 @@ class TGNetwork(nn.Module):
 
     def forward(self,prompt,):
         #prompt:[batchsize,prompt_len]
-        enc_outputs,_=self.encoder(prompt)
+        if self.task_embed:
+            enc_outputs,_=self.encoder(prompt)
 
         #enc_outputs：[batch_size,prompt_len,d_model]
 
-        task_cls=enc_outputs[:,0,:]
+            task_cls=enc_outputs[:,0,:]
+        else:
+            task_cls=prompt
 
         layer_encoding=self.TaskLinear(task_cls)
 
