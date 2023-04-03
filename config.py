@@ -1,7 +1,7 @@
 #This is a config for colossal-ai
 from colossalai.amp import AMP_TYPE
 
-NUM_EPOCHES=200
+NUM_EPOCHS=200
 BATCH_SIZES=256
 LEARNING_RATE=0.01
 WEIGHT_DECAY=1e-4

@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from .TransformerDecoder import Decoder
 from .TransformerEncoder import Encoder
 
 def get_TGNetwork(d_model=512,d_ff=2048,d_k=64,d_v=64,n_layers=4,n_heads=8,attn_pad=False,is_embed=False,
@@ -18,14 +17,16 @@ class TGNetwork(nn.Module):
         self.select_embed_len=select_embbed_len
 
         self.encoder=Encoder(is_embed,d_model,d_k,d_v,d_ff,n_heads,n_layers,feature_size,vocab_size,attn_pad)
-        self.decoder=Decoder(d_model,d_k,d_v,d_ff,n_heads,n_layers,attn_pad)
 
         self.TaskLinear=nn.Sequential(
             nn.Linear(d_model,4*d_model,bias=False),
             nn.ReLU(),
             nn.Linear(4*d_model,gate_len*select_embbed_len,bias=False))
 
-        self.LayerGating=nn.Linear(select_embbed_len,kernel_number)
+        self.LayerGating=nn.Sequential(
+            nn.Linear(select_embbed_len,2*select_embbed_len,bias=False),
+            nn.ReLU(),
+            nn.Linear(2*select_embbed_len,kernel_number,bias=False))
 
     def Improved_SemHash(self,select_weight):
         # select_weight:[batch_size,length,kernel_number]
@@ -40,10 +41,11 @@ class TGNetwork(nn.Module):
         enc_outputs,_=self.encoder(prompt)
         decoder_inputs=torch.zeros(prompt.size(0),1).int().cuda()
         dec_outputs,_,_=self.decoder(decoder_inputs,prompt,enc_outputs)
+        #dec_outputs：[batch_size,prompt_len,d_model]
 
-        dec_output=dec_outputs.squeeze()
+        task_cls=dec_outputs[:,0,:]
 
-        selection_embbeding=self.TaskLinear(dec_output)
+        selection_embbeding=self.TaskLinear(task_cls)
 
         selection_embbeding=selection_embbeding.view(-1,self.gate_len,self.select_embed_len)
 
