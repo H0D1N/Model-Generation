@@ -57,7 +57,8 @@ def main():
     train_loader=get_dataloader(dataset=train_dataset,batch_size=gpc.config.BATCH_SIZES,shuffle=False,pin_memory=True)
     test_loader=get_dataloader(dataset=test_dataset,batch_size=gpc.config.BATCH_SIZES,pin_memory=True)
 
-    optimizer=torch.optim.AdamW(model.parameters(), lr=gpc.config.LEARNING_RATE, weight_decay=gpc.config.WEIGHT_DECAY)
+    optimizer=torch.optim.SGD(model.parameters(),lr=gpc.config.LEARNING_RATE,weight_decay=gpc.config.WEIGHT_DECAY
+                              ,momentum=gpc.config.MOMENTUM)
 
     lr_scheduler = LinearWarmupLR(optimizer, warmup_steps=gpc.config.WARMUP_EPOCHS, total_steps=gpc.config.NUM_EPOCHS)
 
