@@ -28,7 +28,7 @@ class cifarDataset(Dataset):
     def __getitem__(self, idx):
         if idx % 128==0:
             self.task=random.choice(self.task_list)
-        prompt=torch.zeros(100).scatter_(0,torch.tensor(self.task),1).int()
+        prompt=torch.zeros(100).scatter_(0,torch.tensor(self.task),1)
 
         label=random.choice(self.task)
 

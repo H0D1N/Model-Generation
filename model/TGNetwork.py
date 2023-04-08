@@ -30,17 +30,17 @@ class TGNetwork(nn.Module):
             nn.Linear(gate_len * 32, gate_len * 64, bias=False),
             nn.BatchNorm1d(gate_len * 64),
             nn.ReLU(),
-            nn.Linear(gate_len*128,gate_len*select_embbed_len,bias=False))
+            nn.Linear(gate_len*64,gate_len*select_embbed_len,bias=False))
 
         self.LayerGating=nn.Sequential(
             nn.Linear(select_embbed_len,2*select_embbed_len,bias=False),
-            nn.BatchNorm1d(2*select_embbed_len),
+            nn.BatchNorm1d(gate_len),
             nn.ReLU(),
             nn.Linear(2*select_embbed_len, 4 * select_embbed_len, bias=False),
-            nn.BatchNorm1d(4 * select_embbed_len),
+            nn.BatchNorm1d(gate_len),
             nn.ReLU(),
             nn.Linear(4 * select_embbed_len, 8 * select_embbed_len, bias=False),
-            nn.BatchNorm1d(8 * select_embbed_len),
+            nn.BatchNorm1d(gate_len),
             nn.ReLU(),
             nn.Linear(8*select_embbed_len,kernel_number,bias=False))
 

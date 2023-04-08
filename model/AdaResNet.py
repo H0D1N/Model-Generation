@@ -428,15 +428,15 @@ class Ada_ResNet(nn.Module):
 
         x = self.forward_features(x, selection)
         x = self.forward_head(x)
-        return x, selection
+        return x
 
 
 def _create_resnet(variant, pretrained=False, **kwargs):
     return build_model_with_cfg(Ada_ResNet, variant, pretrained, **kwargs)
 
 
-def ada_ResNet(block,layers,classfier_num,pretrained=False, **kwargs):
+def ada_ResNet(block,layers,classifier_num,pretrained=False, **kwargs):
     """Constructs a Ada_ResNet50 model.
     """
-    model_args = dict(block=block, layers=layers, num_classes=classfier_num, **kwargs)
+    model_args = dict(block=block, layers=layers, num_classes=classifier_num, **kwargs)
     return _create_resnet('Ada_ResNet50', pretrained, **dict(model_args, **kwargs))
