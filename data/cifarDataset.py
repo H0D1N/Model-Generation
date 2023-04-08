@@ -26,10 +26,11 @@ class cifarDataset(Dataset):
                 task = list(map(int, curLine))
                 self.task_list.append(task)
     def __getitem__(self, idx):
-        task=random.choice(self.task_list)
-        prompt=torch.zeros(100).scatter_(0,torch.tensor(task),1).int()
+        if idx % 128==0:
+            self.task=random.choice(self.task_list)
+        prompt=torch.zeros(100).scatter_(0,torch.tensor(self.task),1).int()
 
-        label=random.choice(task)
+        label=random.choice(self.task)
 
         image_list=self.idxs[label][0].tolist()
 

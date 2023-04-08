@@ -47,15 +47,15 @@ def main():
     logger.info("initialized distributed environment", ranks=[0])
     logger.info("=> creating model",ranks=[0])
 
-    model=PromptBasedModel()
+    model=PromptBasedModel(task_embed=False)
 
     criterion = sparse_gate_loss()
 
     train_dataset = cifarDataset(task_loc=args.train_task, train=True)
     test_dataset = cifarDataset(task_loc=args.test_task, train=False)
 
-    train_loader=get_dataloader(dataset=train_dataset,batch_size=gpc.config.BATCH_SIZES,shuffle=False,pin_memory=True)
-    test_loader=get_dataloader(dataset=test_dataset,batch_size=gpc.config.BATCH_SIZES,pin_memory=True)
+    train_loader=get_dataloader(dataset=train_dataset,batch_size=gpc.config.BATCH_SIZES,shuffle=False,pin_memory=True,add_sampler=False)
+    test_loader=get_dataloader(dataset=test_dataset,batch_size=gpc.config.BATCH_SIZES,pin_memory=True,shuffle=False,add_sampler=False)
 
     optimizer=torch.optim.SGD(model.parameters(),lr=gpc.config.LEARNING_RATE,weight_decay=gpc.config.WEIGHT_DECAY
                               ,momentum=gpc.config.MOMENTUM)
@@ -125,7 +125,7 @@ def train(engine,train_loader,epoch,logger):
         data_time.update(time.time() - end)
         engine.zero_grad()
         output,selection = engine(prompt,img)
-        output.data.masked_fill_((torch.ones_like(prompt).cuda()-prompt).bool(),-1e4)
+        #output.data.masked_fill_((torch.ones_like(prompt).cuda()-prompt).bool(),-1e4)
         loss = engine.criterion(output,label,selection)
         losses.update(loss.item(), img.size(0))
 

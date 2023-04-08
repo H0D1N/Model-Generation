@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from .TransformerEncoder import Encoder
 
-def get_TGNetwork(task_embed=True,d_model=512,d_ff=2048,d_k=64,d_v=64,n_layers=4,n_heads=8,attn_pad=False,is_embed=False,
+def get_TGNetwork(task_embed=True,d_model=100,d_ff=2048,d_k=64,d_v=64,n_layers=4,n_heads=8,attn_pad=False,is_embed=False,
                   feature_size=0,vocab_size=100,gate_len=34,select_embbed_len=128,kernel_number=512):
     model=TGNetwork(d_model,d_ff,d_k,d_v,n_layers,n_heads,attn_pad,is_embed,
                     feature_size,vocab_size,gate_len,select_embbed_len,kernel_number,task_embed)
@@ -21,14 +21,28 @@ class TGNetwork(nn.Module):
             self.encoder=Encoder(is_embed,d_model,d_k,d_v,d_ff,n_heads,n_layers,feature_size,vocab_size,attn_pad)
 
         self.TaskLinear=nn.Sequential(
-            nn.Linear(d_model,4*d_model,bias=False),
+            nn.Linear(d_model,gate_len*16,bias=False),
+            nn.BatchNorm1d(gate_len*16),
             nn.ReLU(),
-            nn.Linear(4*d_model,gate_len*select_embbed_len,bias=False))
+            nn.Linear(gate_len*16, gate_len * 32, bias=False),
+            nn.BatchNorm1d(gate_len * 32),
+            nn.ReLU(),
+            nn.Linear(gate_len * 32, gate_len * 64, bias=False),
+            nn.BatchNorm1d(gate_len * 64),
+            nn.ReLU(),
+            nn.Linear(gate_len*128,gate_len*select_embbed_len,bias=False))
 
         self.LayerGating=nn.Sequential(
             nn.Linear(select_embbed_len,2*select_embbed_len,bias=False),
+            nn.BatchNorm1d(2*select_embbed_len),
             nn.ReLU(),
-            nn.Linear(2*select_embbed_len,kernel_number,bias=False))
+            nn.Linear(2*select_embbed_len, 4 * select_embbed_len, bias=False),
+            nn.BatchNorm1d(4 * select_embbed_len),
+            nn.ReLU(),
+            nn.Linear(4 * select_embbed_len, 8 * select_embbed_len, bias=False),
+            nn.BatchNorm1d(8 * select_embbed_len),
+            nn.ReLU(),
+            nn.Linear(8*select_embbed_len,kernel_number,bias=False))
 
     def Improved_SemHash(self,select_weight):
         # select_weight:[batch_size,length,kernel_number]
@@ -56,7 +70,6 @@ class TGNetwork(nn.Module):
         #selection_embbeding:[batchsize,layer_len,select_layer_encoding_len]
 
         layer_selection=self.LayerGating(layer_encoding)
-
 
         layer_selection=self.Improved_SemHash(layer_selection)
 
