@@ -10,8 +10,8 @@ class sparse_gate_loss(nn.Module):
 
         #交叉熵部分
         loss = self.bass_criterion(logists, label)
-        if kernel_selection is not None:
-            c=kernel_selection.size()[-1]*kernel_selection.size()[-2]*kernel_selection.size()[-3]
+        #if kernel_selection is not None:
+            #c=kernel_selection.size()[-1]*kernel_selection.size()[-2]*kernel_selection.size()[-3]
             #限制kernel使用率
-            loss=loss+0.1*torch.norm(kernel_selection,p=1)/c
+            #loss=loss+0.1*torch.norm(kernel_selection,p=1)/c
         return loss
