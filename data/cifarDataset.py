@@ -26,8 +26,8 @@ class cifarDataset(Dataset):
                 task = list(map(int, curLine))
                 self.task_list.append(task)
     def __getitem__(self, idx):
-        if idx % 128==0:
-            self.task=random.choice(self.task_list)
+
+        self.task=random.choice(self.task_list)
         prompt=torch.zeros(100).scatter_(0,torch.tensor(self.task),1)
 
         label=random.choice(self.task)
@@ -47,5 +47,3 @@ class cifarDataset(Dataset):
             return 100000
         else:
             return 10000
-
-

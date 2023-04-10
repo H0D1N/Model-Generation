@@ -54,8 +54,8 @@ def main():
     train_dataset = cifarDataset(task_loc=args.train_task, train=True)
     test_dataset = cifarDataset(task_loc=args.test_task, train=False)
 
-    train_loader=get_dataloader(dataset=train_dataset,batch_size=gpc.config.BATCH_SIZES,shuffle=False,pin_memory=True,add_sampler=False)
-    test_loader=get_dataloader(dataset=test_dataset,batch_size=gpc.config.BATCH_SIZES,pin_memory=True,shuffle=False,add_sampler=False)
+    train_loader=get_dataloader(dataset=train_dataset,batch_size=gpc.config.BATCH_SIZES,shuffle=False,pin_memory=True)
+    test_loader=get_dataloader(dataset=test_dataset,batch_size=gpc.config.BATCH_SIZES,pin_memory=True,shuffle=False)
 
     optimizer=torch.optim.SGD(model.parameters(),lr=gpc.config.LEARNING_RATE,weight_decay=gpc.config.WEIGHT_DECAY
                               ,momentum=gpc.config.MOMENTUM)
