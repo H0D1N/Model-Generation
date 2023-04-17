@@ -4,6 +4,7 @@ import shutil
 import colossalai
 import torch
 from timm import utils
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.tensorboard import SummaryWriter
 from colossalai.context import ParallelMode
 from colossalai.core import global_context as gpc
@@ -13,6 +14,7 @@ from colossalai.logging import get_dist_logger
 from model.PrompBasedModel import PromptBasedModel
 from loss.GateLoss import sparse_gate_loss
 from data.cifarDataset import cifarDataset
+from utils import ExponentialMovingAverage
 
 parser=colossalai.get_default_parser()
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -21,14 +23,26 @@ parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
-parser.add_argument('--train_task', default='train.txt', type=str, )
-parser.add_argument('--test_task', default='test.txt', type=str, )
+parser.add_argument('--model_ema',action='store_true')
+parser.add_argument(
+    "--model-ema-steps",
+    type=int,
+    default=32,
+    help="the number of iterations that controls how often to update the EMA model (default: 32)",
+)
+parser.add_argument(
+    "--model-ema-decay",
+    type=float,
+    default=0.99,
+    help="decay factor for Exponential Moving Average of model parameters (default: 0.99998)",
+)
+parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
 
 
 
 def main():
     best_acc1 = 0
-    args = parser.parse_args()
+
 
     colossalai.launch_from_torch(
     config= 'config.py',
@@ -47,20 +61,30 @@ def main():
     logger.info("initialized distributed environment", ranks=[0])
     logger.info("=> creating model",ranks=[0])
 
+    #Cifar100任务的Task不需要Embed
     model=PromptBasedModel(task_embed=False)
+
+    model_ema=None
+    if args.model_ema:
+        adjust=args.world_size*gpc.config.BATCH_SIZES*args.model_ema_steps/gpc.config.NUM_EPOCHS
+        alpha=1.0-args.model_ema_decay
+        alpha=min(1,alpha*adjust)
+        model_ema=ExponentialMovingAverage(model,device='cuda',decay=1-alpha)
+
+
 
     criterion = sparse_gate_loss()
 
-    train_dataset = cifarDataset(task_loc=args.train_task, train=True)
-    test_dataset = cifarDataset(task_loc=args.test_task, train=False)
+    train_dataset = cifarDataset(train=True)
+    test_dataset = cifarDataset( train=False)
 
-    train_loader=get_dataloader(dataset=train_dataset,batch_size=gpc.config.BATCH_SIZES,shuffle=False,pin_memory=True)
+    train_loader=get_dataloader(dataset=train_dataset,batch_size=gpc.config.BATCH_SIZES,shuffle=False,pin_memory=True,)
     test_loader=get_dataloader(dataset=test_dataset,batch_size=gpc.config.BATCH_SIZES,pin_memory=True,shuffle=False)
 
     optimizer=torch.optim.SGD(model.parameters(),lr=gpc.config.LEARNING_RATE,weight_decay=gpc.config.WEIGHT_DECAY
-                              ,momentum=gpc.config.MOMENTUM)
+                             ,momentum=gpc.config.MOMENTUM)
 
-    lr_scheduler = LinearWarmupLR(optimizer, warmup_steps=gpc.config.WARMUP_EPOCHS, total_steps=gpc.config.NUM_EPOCHS)
+    lr_scheduler = StepLR(optimizer, step_size=30, gamma=0.5)
 
     if args.resume:
         if os.path.isfile(args.resume):
@@ -87,8 +111,12 @@ def main():
         return
 
     for epoch in range(args.start_epoch,gpc.config.NUM_EPOCHS):
-        train(engine,train_loader,epoch,logger)
-        acc1,usage,loss=validate(engine,test_loader,logger,epoch,best_acc1)
+        train(engine,train_loader,epoch,logger,model_ema)
+        #EMA与无EMA作对比
+        if model_ema:
+            acc1,usage,loss=validate(model_ema,test_loader,logger,epoch,best_acc1,criterion=criterion)
+            best_acc1 = max(acc1, best_acc1)
+        acc1, usage, loss = validate(engine, test_loader, logger, epoch, best_acc1)
         lr_scheduler.step()
 
         writer.add_scalar(tag='acc',scalar_value=acc1,global_step=epoch)
@@ -98,6 +126,8 @@ def main():
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
+        #EMA的存储还没加入
+        '''
         save_checkpoint({
             'epoch': epoch + 1,
             'arch': 'Ada_ResNet',
@@ -106,8 +136,9 @@ def main():
             'optimizer': optimizer.state_dict(),
             'scheduler': lr_scheduler.state_dict()
         }, is_best)
+        '''
 
-def train(engine,train_loader,epoch,logger):
+def train(engine,train_loader,epoch,logger,model_ema=None):
     batch_time = utils.AverageMeter()
     data_time = utils.AverageMeter()
     losses = utils.AverageMeter()
@@ -125,7 +156,8 @@ def train(engine,train_loader,epoch,logger):
         data_time.update(time.time() - end)
         engine.zero_grad()
         output,selection = engine(prompt,img)
-        #output.data.masked_fill_((torch.ones_like(prompt).cuda()-prompt).bool(),-1e4)
+        #output.data.masked_fill_((torch.ones_like(prompt).cuda()-prompt).bool(),0)
+        output = output * prompt
         loss = engine.criterion(output,label,selection)
         losses.update(loss.item(), img.size(0))
 
@@ -133,6 +165,8 @@ def train(engine,train_loader,epoch,logger):
         engine.step()
         batch_time.update(time.time() - end)
         end = time.time()
+        if model_ema and i % args.model_ema_steps == 0:
+            model_ema.update_parameters(engine.model)
 
 
     logger.info(
@@ -147,7 +181,7 @@ def train(engine,train_loader,epoch,logger):
                 data_time=data_time),ranks=[0]
             )
 
-def validate(engine,test_loader,logger,epoch,best_acc1):
+def validate(engine,test_loader,logger,epoch,best_acc1,criterion=None):
     def run_validate(test_loader):
         with torch.no_grad():
             end = time.time()
@@ -158,12 +192,17 @@ def validate(engine,test_loader,logger,epoch,best_acc1):
                 prompt = prompt.cuda()
 
                 output,selection = engine(prompt,img)
-                output.data.masked_fill_((torch.ones_like(prompt).cuda() - prompt).bool(), -1e4)
-                loss = engine.criterion(output, label,selection)
+                #output.data.masked_fill_((torch.ones_like(prompt).cuda() - prompt).bool(), 0)
+                #output.data.masked_fill_((torch.ones_like(prompt).cuda() - prompt).bool(), -1e4)
+                output=output*prompt
+                if criterion:
+                    loss=criterion(output, label,selection)
+                else:
+                    loss = engine.criterion(output, label,selection)
 
 
                 if selection is not None:
-                    selection = (100*torch.norm(selection, p=1)) / (selection.size()[-2] * selection.size()[-1]*selection.size()[-3])
+                    selection = selection.mean()
                     usage.update(selection.item(), img.size(0))
 
                 # measure accuracy and record loss
@@ -211,6 +250,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
         shutil.copyfile(filename, 'model_best.pth.tar')
 
 if __name__ == '__main__':
+    args = parser.parse_args()
     main()
 
 

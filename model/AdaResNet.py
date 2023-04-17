@@ -2,11 +2,10 @@ from functools import partial
 import torch
 import torch.nn as nn
 import math
-from timm.models.registry import  model_entrypoint
+from timm.models.registry import model_entrypoint
 from timm.models.helpers import build_model_with_cfg
 from timm.models.layers import DropBlock2d, DropPath, AvgPool2dSame, \
     get_act_layer, get_norm_layer, create_classifier
-
 
 
 class Bottleneck(nn.Module):
@@ -59,7 +58,7 @@ class Bottleneck(nn.Module):
         if getattr(self.bn3, 'weight', None) is not None:
             nn.init.zeros_(self.bn3.weight)
 
-    def forward(self, x, kernel_selection=None):
+    def forward(self, x, kernel_selection=None, ):
         shortcut = x
         if kernel_selection == None:
             x = self.conv1(x)
@@ -85,19 +84,22 @@ class Bottleneck(nn.Module):
             x = self.conv1(x)
 
             x = self.bn1(x)
-            x = x * kernel_selection[:, 0, :][:, :self.conv1.out_channels, None, None]
+            x = x * kernel_selection[:, 0, :][:, :self.conv1.out_channels, None,
+                    None]  # *act_selection[:, 0, :][:, :self.conv1.out_channels, None, None]
             x = self.act1(x)
 
             x = self.conv2(x)
             x = self.bn2(x)
-            x = x * kernel_selection[:, 1, :][:, :self.conv2.out_channels, None, None]
+            x = x * kernel_selection[:, 1, :][:, :self.conv2.out_channels, None,
+                    None]  # *act_selection[:, 1, :][:, :self.conv2.out_channels, None, None]
             x = self.drop_block(x)
             x = self.act2(x)
 
             x = self.conv3(x)
 
             x = self.bn3(x)
-            x = x * kernel_selection[:, 2, ][:, :self.conv3.out_channels, None, None]
+            x = x * kernel_selection[:, 2, ][:, :self.conv3.out_channels, None,
+                    None]  # *act_selection[:, 2, :][:, :self.conv3.out_channels, None, None]
 
             if self.drop_path is not None:
                 x = self.drop_path(x)
@@ -314,12 +316,11 @@ class Ada_ResNet(nn.Module):
         act_layer = get_act_layer(act_layer)
         norm_layer = get_norm_layer(norm_layer)
 
-
         inplanes = 64
 
         self.conv1 = nn.Conv2d(in_chans, inplanes, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = norm_layer(inplanes)
-        self.act1 = act_layer(inplace=True)
+        # self.bn1 = norm_layer(inplanes)
+        # self.act1 = act_layer(inplace=True)
         self.feature_info = [dict(num_chs=inplanes, reduction=2, module='act1')]
 
         # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -350,6 +351,7 @@ class Ada_ResNet(nn.Module):
         # Head (Pooling and Classifier)
         self.num_features = 512 * block.expansion
         self.global_pool, self.fc = create_classifier(self.num_features, self.num_classes, pool_type=global_pool)
+        #self.drop_out = nn.Dropout(p=0.5)
         self.init_weights(zero_init_last=zero_init_last)
 
     @staticmethod
@@ -386,10 +388,9 @@ class Ada_ResNet(nn.Module):
 
     def forward_features(self, x, decision=None):
         x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.act1(x)
+        # x = self.bn1(x)
+        # x = self.act1(x)
         # x = self.maxpool(x)
-
         if decision == None:
             for layer in self.layer1:
                 x = layer(x)
@@ -419,12 +420,14 @@ class Ada_ResNet(nn.Module):
 
         return x
 
-    def forward_head(self, x,):
-
+    def forward_head(self, x):
         x = self.global_pool(x)
+        #drop还没尝试
+        #x = self.drop_out(x)
+
         return self.fc(x)
 
-    def forward(self, x, selection=None):
+    def forward(self, x, selection=None, act_selection=None):
 
         x = self.forward_features(x, selection)
         x = self.forward_head(x)
@@ -435,8 +438,8 @@ def _create_resnet(variant, pretrained=False, **kwargs):
     return build_model_with_cfg(Ada_ResNet, variant, pretrained, **kwargs)
 
 
-def ada_ResNet(block,layers,classifier_num,pretrained=False, **kwargs):
+def ada_ResNet(block, layers, classfier_num, pretrained=False, **kwargs):
     """Constructs a Ada_ResNet50 model.
     """
-    model_args = dict(block=block, layers=layers, num_classes=classifier_num, **kwargs)
+    model_args = dict(block=block, layers=layers, num_classes=classfier_num, **kwargs)
     return _create_resnet('Ada_ResNet50', pretrained, **dict(model_args, **kwargs))

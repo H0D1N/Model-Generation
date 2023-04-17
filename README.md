@@ -7,6 +7,11 @@ Use the Colossal-AI for training
 ~~~
 colossalai run --nproc_per_node 4 train.py
 ~~~
+### Using EMA for trainning
+~~~
+colossalai run --nproc_per_node 4 train.py --model_ema --world_size 4
+~~~
+
 ## Problem
 In config.py, Gradient Clipping is not working，so I comment out 
 ~~~
